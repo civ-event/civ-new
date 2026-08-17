@@ -7,6 +7,8 @@ import {
   selectRole as selectRoleApi,
 } from '../api/user';
 
+const TOKEN_KEY = 'accessToken';
+
 export const useUserStore = defineStore('user', {
   state: () => ({
     loaded: false,
@@ -26,17 +28,18 @@ export const useUserStore = defineStore('user', {
       this.token = data.token ?? null;
       this.role = data.role ?? null;
       if (this.token) {
-        localStorage.setItem('civ_event_token', this.token);
+        localStorage.setItem(TOKEN_KEY, this.token);
       } else {
+        localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem('civ_event_token');
       }
       this.loaded = true;
     },
-    async login() {
-      const data = await loginApi({});
+    async login(payload = {}) {
+      const data = await loginApi(payload);
       this.token = data.token;
       this.isLoggedIn = true;
-      localStorage.setItem('civ_event_token', data.token);
+      localStorage.setItem(TOKEN_KEY, data.token);
       await this.loadSession();
       return data;
     },
@@ -58,12 +61,13 @@ export const useUserStore = defineStore('user', {
       try {
         await logoutApi();
       } catch {
-        // 本地也要清登录态，避免接口失败后卡在已登录
+        // 本地也要清登录态
       }
       this.isLoggedIn = false;
       this.token = null;
       this.role = null;
       this.roles = [];
+      localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem('civ_event_token');
     },
   },
