@@ -24,8 +24,6 @@ export default defineConfig(({ command, mode }) => {
           target: 'https://activity-api-test.mars-era.cn',
           changeOrigin: true,
           secure: false,
-          // 后台确认路径后再决定是否去掉 /api：
-          // rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },
     },

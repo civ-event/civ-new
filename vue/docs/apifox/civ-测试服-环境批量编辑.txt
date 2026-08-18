@@ -1,0 +1,15 @@
+# Apifox 环境「批量编辑」粘贴内容
+# 用法：环境管理 → + 新建环境 → 命名 civ-测试服 → 批量编辑 → 粘贴下面内容 → 保存
+# 注意：oauthToken / accessToken 换成你的真实 JWT
+
+baseUrl=https://activity-api-test.mars-era.cn
+source=170062771945205
+oldSource=120058564090281
+gameCode=mpopen
+playerId=829224013701532
+roleId=
+serverId=
+serverName=
+oauthToken=
+accessToken=
+time=1735689600

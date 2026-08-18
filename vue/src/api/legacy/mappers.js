@@ -16,14 +16,61 @@ function unixToIso(unixSeconds) {
   return new Date(utc - 5 * 3600000).toISOString().replace('Z', '-05:00');
 }
 
+/** 将 civ-event time-config 各日期格式转为 UTC-5 ISO 字符串 */
+function parseLegacyDateTime(raw) {
+  const text = raw.trim();
+  // DD/MM/YYYY HH:mm[:ss]
+  let match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (match) {
+    const [, day, month, year, hour, minute, second = '00'] = match;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute}:${second.padStart(2, '0')}-05:00`;
+  }
+  // YYYY-MM-DD HH:mm[:ss]
+  match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (match) {
+    const [, year, month, day, hour, minute, second = '00'] = match;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute}:${second.padStart(2, '0')}-05:00`;
+  }
+  if (text.includes('T')) {
+    return text.includes('-05:00') ? text : `${text}-05:00`;
+  }
+  return `${text.replace(' ', 'T')}-05:00`;
+}
+
 function parseTimeRange(rangeText) {
   if (!rangeText || typeof rangeText !== 'string') {
     return { startAt: null, endAt: null };
   }
-  const [startRaw, endRaw] = rangeText.split('~').map((part) => part.trim());
+
+  const normalized = rangeText.replace(/\s*\(UTC[-+]?\d+(?::\d+)?\)\s*$/i, '').trim();
+  if (!normalized) {
+    return { startAt: null, endAt: null };
+  }
+
+  let startRaw;
+  let endRaw;
+
+  if (normalized.includes('~')) {
+    [startRaw, endRaw] = normalized.split('~').map((part) => part.trim());
+  } else {
+    const ddmmRange = normalized.match(
+      /^(\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*(\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}(?::\d{2})?)$/,
+    );
+    if (ddmmRange) {
+      [, startRaw, endRaw] = ddmmRange;
+    } else {
+      const isoRange = normalized.match(
+        /^(\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*(\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?)$/,
+      );
+      if (isoRange) {
+        [, startRaw, endRaw] = isoRange;
+      }
+    }
+  }
+
   return {
-    startAt: startRaw ? startRaw.replace(' ', 'T') + '-05:00' : null,
-    endAt: endRaw ? endRaw.replace(' ', 'T') + '-05:00' : null,
+    startAt: startRaw ? parseLegacyDateTime(startRaw) : null,
+    endAt: endRaw ? parseLegacyDateTime(endRaw) : null,
   };
 }
 
@@ -61,7 +108,7 @@ export function mapLegacyRole(role) {
 export function mapSessionFromRole(role, token) {
   const mappedRole = mapLegacyRole(role);
   return {
-    isLoggedIn: Boolean(token && mappedRole?.roleId),
+    isLoggedIn: Boolean(token),
     token: token || null,
     role: mappedRole,
   };

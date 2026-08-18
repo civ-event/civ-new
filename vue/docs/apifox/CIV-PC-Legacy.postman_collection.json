@@ -1,0 +1,390 @@
+{
+  "info": {
+    "name": "CIV-PC 对接 civ-event 测试服",
+    "description": "新项目 localhost:5176 对接老后端接口集合。\n\n导入 Apifox：项目 → 导入 → Postman Collection → 选本文件。\n\n环境变量（测试服）：\n- baseUrl: https://activity-api-test.mars-era.cn\n- source: 110060763128467\n- oldSource: 120058564090281\n- gameCode: mpopen\n- playerId: 登录响应 user_info.player_id\n- oauthToken: 游戏 OAuth token（仅登录 Body 用）\n- accessToken: 登录响应 accessToken（Header 用）\n- time: Unix 秒级时间戳",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://activity-api-test.mars-era.cn" },
+    { "key": "source", "value": "110060763128467" },
+    { "key": "oldSource", "value": "120058564090281" },
+    { "key": "gameCode", "value": "mpopen" },
+    { "key": "playerId", "value": "829224013701532" },
+    { "key": "roleId", "value": "" },
+    { "key": "serverId", "value": "" },
+    { "key": "serverName", "value": "" },
+    { "key": "oauthToken", "value": "" },
+    { "key": "accessToken", "value": "" },
+    { "key": "time", "value": "1735689600" }
+  ],
+  "item": [
+    {
+      "name": "0-基础",
+      "item": [
+        {
+          "name": "GET 服务器时间",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/time/get-timestamp?time={{time}}&source={{source}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "time", "get-timestamp"],
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" }
+              ]
+            },
+            "description": "无需登录。对应前端 fetchActivityInfo() 之一。"
+          }
+        },
+        {
+          "name": "GET 活动时间配置",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/activities/time-config?gamecode={{gameCode}}&activity_id={{source}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "activities", "time-config"],
+              "query": [
+                { "key": "gamecode", "value": "{{gameCode}}" },
+                { "key": "activity_id", "value": "{{source}}" }
+              ]
+            },
+            "description": "无需登录。配置不对时可能 400，不影响主流程。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1-登录与角色",
+      "item": [
+        {
+          "name": "PUT 登录 login-and-bind-roles",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json.accessToken || json.data?.accessToken;",
+                  "const playerId = json.user_info?.player_id || json.data?.user_info?.player_id;",
+                  "if (token) { pm.collectionVariables.set('accessToken', token); }",
+                  "if (playerId) { pm.collectionVariables.set('playerId', playerId); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accessToken\": \"{{oauthToken}}\",\n  \"source\": \"{{source}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/oauth/login-and-bind-roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "oauth", "login-and-bind-roles"]
+            },
+            "description": "Body 用 oauthToken（游戏 token）。响应最外层 accessToken 写入环境变量，后续 Header 使用。"
+          }
+        },
+        {
+          "name": "GET 已绑定角色 get-binded-roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/games/get-binded-roles?time={{time}}&source={{source}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "games", "get-binded-roles"],
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" }
+              ]
+            },
+            "description": "对应 fetchRoles() 第一步。"
+          }
+        },
+        {
+          "name": "GET 全部角色 allRoles",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/games/{{gameCode}}/players/{{playerId}}/roles?time={{time}}&source={{source}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "games", "{{gameCode}}", "players", "{{playerId}}", "roles"],
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" }
+              ]
+            },
+            "description": "无已绑角色时调用。从 roles 列表取 role_id/server_id/server_name 用于绑定。"
+          }
+        },
+        {
+          "name": "PUT 绑定角色 bind-server",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_id\": \"{{roleId}}\",\n  \"server_id\": \"{{serverId}}\",\n  \"server_name\": \"{{serverName}}\",\n  \"source\": \"{{source}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/games/bind-server",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "games", "bind-server"]
+            },
+            "description": "对应 selectRole() 未绑定场景。"
+          }
+        },
+        {
+          "name": "POST 切换角色 change-user",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "server_id", "value": "{{serverId}}" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/user/change-user",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user", "change-user"]
+            },
+            "description": "对应 selectRole() 已绑定场景。"
+          }
+        },
+        {
+          "name": "GET 用户扩展信息 user-extend-info",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/user/user-extend-info?time={{time}}&source={{source}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user", "user-extend-info"],
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" }
+              ]
+            },
+            "description": "对应 fetchSession / 签到状态 / 转盘信息 / 券记录 / 中奖记录。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2-签到",
+      "item": [
+        {
+          "name": "POST 每日签到 queued-clock-in",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "sub_type", "value": "1", "description": "第几天，= 已签天数+1" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/check-in/queued-clock-in?time={{time}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "check-in", "queued-clock-in"],
+              "query": [{ "key": "time", "value": "{{time}}" }]
+            },
+            "description": "对应 dailyCheckin()。"
+          }
+        },
+        {
+          "name": "POST 累计签到领奖 get-by-check-in-num",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "check_in_num", "value": "7", "description": "7 或 10" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/games/get-by-check-in-num",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "games", "get-by-check-in-num"]
+            },
+            "description": "对应 claimCheckinMilestone({ days: 7|10 })。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3-幸运转盘",
+      "item": [
+        {
+          "name": "POST 转盘抽奖 lottery-submit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "times", "value": "1", "description": "1 或 10" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/games/lottery-submit",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "games", "lottery-submit"]
+            },
+            "description": "对应 spinWheel({ times: 1|10 })。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4-累充",
+      "item": [
+        {
+          "name": "GET 累充进度 get-activity-period-record",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recharge/get-activity-period-record?time={{time}}&source={{oldSource}}&role_id={{roleId}}&server_id={{serverId}}&player_id={{playerId}}&game_code={{gameCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "recharge", "get-activity-period-record"],
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{oldSource}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "player_id", "value": "{{playerId}}" },
+                { "key": "game_code", "value": "{{gameCode}}" }
+              ]
+            },
+            "description": "注意 source 用 oldSource。对应 fetchTopupProgress()。"
+          }
+        },
+        {
+          "name": "POST 累充领奖 get-activity-period-rewards",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{oldSource}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "player_id", "value": "{{playerId}}" },
+                { "key": "game_code", "value": "{{gameCode}}" },
+                { "key": "level", "value": "499", "description": "499|999|1999|2999|4999|9999" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/recharge/get-activity-period-rewards?time={{time}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "recharge", "get-activity-period-rewards"],
+              "query": [{ "key": "time", "value": "{{time}}" }]
+            },
+            "description": "对应 claimTopupReward({ amount })。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5-老项目有但新页面未用",
+      "item": [
+        {
+          "name": "POST 充值抽奖 recharge-lottery-submit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/games/recharge-lottery-submit"
+          }
+        },
+        {
+          "name": "POST 感谢礼包 get-thank-you-reward",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/games/get-thank-you-reward"
+          }
+        }
+      ]
+    }
+  ]
+}

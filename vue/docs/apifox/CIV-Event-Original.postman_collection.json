@@ -1,0 +1,430 @@
+{
+  "info": {
+    "name": "civ-event 老项目原始接口",
+    "description": "来源：/Users/a/civ-event/src/api/index.js\n\n与 CIV-PC-Legacy 的区别：\n- 本集合按 civ-event 前端方法名组织，含拼图/充值抽奖/感谢礼包/FB 上报等全部 20 个接口\n- CIV-PC-Legacy 仅含新项目页面对接所需的子集\n\n导入：Apifox → 导入 → Postman 集合\n环境变量与 CIV-PC-Legacy 相同（source / oldSource / oauthToken / accessToken 等）",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://activity-api-test.mars-era.cn" },
+    { "key": "source", "value": "110060763128467" },
+    { "key": "oldSource", "value": "120058564090281" },
+    { "key": "gameCode", "value": "mpopen" },
+    { "key": "playerId", "value": "829224013701532" },
+    { "key": "roleId", "value": "" },
+    { "key": "serverId", "value": "" },
+    { "key": "serverName", "value": "" },
+    { "key": "oauthToken", "value": "" },
+    { "key": "accessToken", "value": "" },
+    { "key": "time", "value": "1735689600" }
+  ],
+  "item": [
+    {
+      "name": "0-基础",
+      "item": [
+        {
+          "name": "getTimestamp 服务器时间",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/time/get-timestamp?time={{time}}&source={{source}}",
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "getTimeConfig 活动时间配置",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/activities/time-config?gamecode={{gameCode}}&activity_id={{source}}",
+              "query": [
+                { "key": "gamecode", "value": "{{gameCode}}" },
+                { "key": "activity_id", "value": "{{source}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1-登录与用户",
+      "item": [
+        {
+          "name": "login 登录并绑角色",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "if (json.user_info?.player_id) pm.collectionVariables.set('playerId', json.user_info.player_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accessToken\": \"{{oauthToken}}\",\n  \"source\": \"{{source}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/oauth/login-and-bind-roles"
+          }
+        },
+        {
+          "name": "userInfo 用户扩展信息",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "accessToken", "value": "{{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/user/user-extend-info?time={{time}}&source={{source}}",
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "changeUser 切换角色",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "server_id", "value": "{{serverId}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/user/change-user"
+          }
+        },
+        {
+          "name": "reportInfo FB 上报",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/user/fb/report-info"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2-角色",
+      "item": [
+        {
+          "name": "bindedRoles 已绑定角色",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "accessToken", "value": "{{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/games/get-binded-roles?time={{time}}&source={{source}}",
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "allRoles 全部角色",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "accessToken", "value": "{{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/games/{{gameCode}}/players/{{playerId}}/roles?time={{time}}&source={{source}}",
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "bind 绑定区服",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_id\": \"{{roleId}}\",\n  \"server_id\": \"{{serverId}}\",\n  \"server_name\": \"{{serverName}}\",\n  \"source\": \"{{source}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/games/bind-server"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3-签到",
+      "item": [
+        {
+          "name": "sign 每日签到",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "sub_type", "value": "1" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/check-in/queued-clock-in?time={{time}}"
+          }
+        },
+        {
+          "name": "acSign 累计签到领奖",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "check_in_num", "value": "7" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/games/get-by-check-in-num"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4-幸运转盘",
+      "item": [
+        {
+          "name": "lotterySubmit 转盘抽奖",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "times", "value": "1" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/games/lottery-submit"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5-累充",
+      "item": [
+        {
+          "name": "getRechargeInfo 累充进度",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "accessToken", "value": "{{accessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/recharge/get-activity-period-record?time={{time}}&source={{oldSource}}&role_id={{roleId}}&server_id={{serverId}}&player_id={{playerId}}&game_code={{gameCode}}",
+              "query": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{oldSource}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "player_id", "value": "{{playerId}}" },
+                { "key": "game_code", "value": "{{gameCode}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "getRechargeReward 累充领奖",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{oldSource}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" },
+                { "key": "player_id", "value": "{{playerId}}" },
+                { "key": "game_code", "value": "{{gameCode}}" },
+                { "key": "level", "value": "499" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/recharge/get-activity-period-rewards?time={{time}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6-充值抽奖",
+      "item": [
+        {
+          "name": "rechargeLotterySubmit 充值抽奖",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/games/recharge-lottery-submit"
+          }
+        },
+        {
+          "name": "getRechargeLotteryReward 充值抽奖里程碑",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "time", "value": "{{time}}" },
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/games/get-recharge-lottery-milestone-reward?time={{time}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7-拼图",
+      "item": [
+        {
+          "name": "completeTask 完成任务",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/puzzle/complete-task"
+          }
+        },
+        {
+          "name": "placePiece 放置拼图",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/puzzle/place-piece"
+          }
+        },
+        {
+          "name": "claimPuzzleMilestone 拼图里程碑",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/puzzle/claim-milestone"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8-其他",
+      "item": [
+        {
+          "name": "getThankYouReward 感谢礼包",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "accessToken", "value": "{{accessToken}}" },
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "source", "value": "{{source}}" },
+                { "key": "server_id", "value": "{{serverId}}" },
+                { "key": "role_id", "value": "{{roleId}}" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/games/get-thank-you-reward"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,11 @@
 # CIV 活动接口清单
 
 > 便于联调查阅。本仓库 **`VITE_USE_MOCK=false` 时已对接 civ-event 旧版测试服 API**（`src/api/legacy/` 适配层）。
+>
+> **Apifox 联调（推荐，新老项目共用环境）：** [`apifox/README.md`](./apifox/README.md)  
+> - 集合：[`apifox/CIV-All-In-One.postman_collection.json`](./apifox/CIV-All-In-One.postman_collection.json)  
+> - 环境：[`apifox/CIV-Test-Env.postman_environment.json`](./apifox/CIV-Test-Env.postman_environment.json)  
+> **字段映射：** [`API_FIELD_MAPPING.md`](./API_FIELD_MAPPING.md)
 
 ---
 

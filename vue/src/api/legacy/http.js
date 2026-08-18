@@ -44,6 +44,11 @@ function unwrapLegacyResponse(payload, status) {
     return payload;
   }
 
+  // 如 login-and-bind-roles 直接返回 { user_info, roles, accessToken }，无 code 字段
+  if (payload.code == null) {
+    return payload;
+  }
+
   if (payload.code === 0 || payload.code === 200) {
     return payload.data ?? payload;
   }

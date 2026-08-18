@@ -27,6 +27,7 @@ import {
   clearRoleCache,
   getActiveRoleContext,
   getRoleCache,
+  restoreRoleCacheFromSession,
   setAccessToken,
   setBindedRoles,
   setRechargeInfo,
@@ -36,9 +37,55 @@ import {
 
 const time = () => getLegacyTimeParam();
 
+function pickRoleFromLoginResponse(roles = [], roleId) {
+  if (!roles.length) return null;
+  if (roleId) {
+    const matched = roles.find(
+      (item) => String(item.roleId ?? item.role_id) === String(roleId),
+    );
+    if (matched) return matched;
+  }
+  return roles[0];
+}
+
+async function applyLoginAndBindRoles(accessToken, roleId) {
+  const urlParams = readUrlParams();
+  const data = await legacyPut('/oauth/login-and-bind-roles', {
+    accessToken,
+    roleId: roleId || urlParams.roleId || undefined,
+    source: legacyConfig.source,
+  });
+
+  const token = data?.accessToken ?? accessToken;
+  storeToken(token);
+  setUserMeta({
+    playerId: data?.user_info?.player_id,
+    userName: data?.user_info?.username,
+  });
+
+  const roles = data?.roles ?? [];
+  setBindedRoles(roles);
+  const role = pickRoleFromLoginResponse(roles, roleId);
+  if (role) {
+    setRole(role);
+  }
+  return role;
+}
+
+async function restoreRoleViaLogin(accessToken) {
+  const cachedRoleId = getRoleCache().role?.roleId ?? getRoleCache().role?.role_id;
+  try {
+    return await applyLoginAndBindRoles(accessToken, cachedRoleId);
+  } catch {
+    return getRoleCache().role ?? null;
+  }
+}
+
 async function refreshRoleFromServer() {
-  const ctx = getActiveRoleContext();
-  const data = await legacyGet('/user/user-extend-info', withSource({ time: time() }));
+  const data = await legacyGetOptional('/user/user-extend-info', withSource({ time: time() }));
+  if (!data) {
+    return getRoleCache().role ?? null;
+  }
   const userInfo = data?.userInfo ?? data?.roles?.[0] ?? data;
   if (userInfo) {
     setRole(userInfo);
@@ -110,14 +157,36 @@ export async function legacyFetchSession() {
   }
 
   setAccessToken(token);
+  restoreRoleCacheFromSession();
+
   try {
-    const role = await refreshRoleFromServer();
+    const extendData = await legacyGetOptional(
+      '/user/user-extend-info',
+      withSource({ time: time() }),
+    );
+
+    let role = null;
+    if (extendData) {
+      role = extendData?.userInfo ?? extendData?.roles?.[0] ?? extendData;
+      if (role) setRole(role);
+    } else {
+      // 测试服 user-extend-info 404：自动 re-login 拉取最新角色/签到/转盘状态
+      role = await restoreRoleViaLogin(token);
+      if (!role) {
+        role = getRoleCache().role ?? null;
+      }
+    }
+
     await refreshRechargeInfo().catch(() => {});
     return mapSessionFromRole(role, token);
-  } catch {
-    localStorage.removeItem('accessToken');
-    clearRoleCache();
-    return mapSessionFromRole(null, null);
+  } catch (err) {
+    if (err?.code === ErrorCode.NOT_LOGGED_IN) {
+      localStorage.removeItem('accessToken');
+      clearRoleCache();
+      return mapSessionFromRole(null, null);
+    }
+    const fallbackRole = getRoleCache().role ?? null;
+    return mapSessionFromRole(fallbackRole, token);
   }
 }
 
@@ -132,28 +201,12 @@ export async function legacyLogin(payload = {}) {
   }
 
   const urlParams = readUrlParams();
-  const data = await legacyPut('/oauth/login-and-bind-roles', {
-    accessToken,
-    roleId: payload.roleId || urlParams.roleId || undefined,
-    source: legacyConfig.source,
-  });
-
-  const token = data?.accessToken ?? accessToken;
-  storeToken(token);
-  setUserMeta({
-    playerId: data?.user_info?.player_id,
-    userName: data?.user_info?.username,
-  });
-
-  const roles = data?.roles ?? [];
-  setBindedRoles(roles);
-  if (roles[0]) {
-    setRole(roles[0]);
-    await refreshRechargeInfo().catch(() => {});
-  }
+  const roleId = payload.roleId || urlParams.roleId || undefined;
+  await applyLoginAndBindRoles(accessToken, roleId);
+  await refreshRechargeInfo().catch(() => {});
 
   return {
-    token,
+    token: localStorage.getItem('accessToken'),
     isLoggedIn: true,
   };
 }
@@ -171,10 +224,10 @@ export async function legacyFetchRoles() {
     return { roles: mapRolesList(cache.bindedRoles) };
   }
 
-  const data = await legacyGet('/games/get-binded-roles', withSource({ time: time() }));
+  const data = await legacyGetOptional('/games/get-binded-roles', withSource({ time: time() }));
   const roles = data?.roles ?? [];
-  setBindedRoles(roles);
   if (roles.length) {
+    setBindedRoles(roles);
     return { roles: mapRolesList(roles) };
   }
 
@@ -183,7 +236,7 @@ export async function legacyFetchRoles() {
     return { roles: [] };
   }
 
-  const allData = await legacyGet(
+  const allData = await legacyGetOptional(
     `/games/${legacyConfig.gameCode}/players/${playerId}/roles`,
     withSource({ time: time() }),
   );
