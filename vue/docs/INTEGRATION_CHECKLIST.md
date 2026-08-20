@@ -2,6 +2,7 @@
 
 > 测试服：`https://activity-api-test.mars-era.cn`  
 > 活动 source：`140011140100489`（以 `.env.development` / Apifox 环境为准）  
+> Hosts 配置：见 **[HOSTS.md](./HOSTS.md)**  
 > 完成日期：2026-08-18
 
 ---

@@ -18,7 +18,7 @@
 
 ### 联调前置
 
-1. `/etc/hosts`：`10.1.1.25 activity-api-test.mars-era.cn`
+1. `/etc/hosts`：见 **[HOSTS.md](./HOSTS.md)**（至少 `activity-api-test.mars-era.cn` + `passport-test.mars-era.cn` → `10.1.1.25`）
 2. `.env.development` 中配置正确的 `VITE_APP_SOURCE` / `VITE_APP_OLD_SOURCE`（与 civ-event 一致）
 3. 登录需 `accessToken`：URL 带 `?player_token=xxx`，或配置 `VITE_DEV_ACCESS_TOKEN`
 

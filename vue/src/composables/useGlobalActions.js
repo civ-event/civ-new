@@ -4,8 +4,11 @@ import { useTopupStore } from '../stores/topup';
 import { useUiStore } from '../stores/ui';
 import { useUserStore } from '../stores/user';
 import { useWheelStore } from '../stores/wheel';
-import { ExternalLinks, openExternalLink } from '../utils/links';
+import { ExternalLinks } from '../utils/links';
 import { getErrorMessage } from '../utils/error';
+import { resolveLoginToken } from '../bridge/auth.js';
+import { openUrl } from '../bridge/navigation.js';
+import { shareToPlatform } from '../bridge/share.js';
 
 export function useGlobalActions() {
   const { t } = useI18n();
@@ -59,7 +62,8 @@ export function useGlobalActions() {
 
     uiStore.showLoading();
     try {
-      await userStore.login();
+      const accessToken = await resolveLoginToken();
+      await userStore.login({ accessToken });
       uiStore.showToast(t('toast.loginSuccess'), 'success');
       await openCharacterSelectModal();
     } catch (error) {
@@ -70,15 +74,24 @@ export function useGlobalActions() {
   }
 
   function handleDownloadClick() {
-    openExternalLink(ExternalLinks.DOWNLOAD);
+    openUrl(ExternalLinks.DOWNLOAD);
   }
 
-  function handleFacebookClick() {
-    openExternalLink(ExternalLinks.FACEBOOK);
+  async function handleFacebookClick() {
+    try {
+      await shareToPlatform({
+        platform: 'facebook',
+        text: 'Join the Pop Epoch event!',
+        url: ExternalLinks.FACEBOOK,
+        image: '',
+      });
+    } catch (error) {
+      uiStore.showToast(getErrorMessage(error), 'error');
+    }
   }
 
   function handleDiscordClick() {
-    openExternalLink(ExternalLinks.DISCORD);
+    openUrl(ExternalLinks.DISCORD);
   }
 
   return {

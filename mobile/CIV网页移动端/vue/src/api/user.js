@@ -1,26 +1,34 @@
 import request from './request';
+import * as legacy from './legacy';
+
+const useMock = import.meta.env.VITE_USE_MOCK === 'true';
 
 /** 获取当前登录态 */
 export function fetchSession() {
-  return request.get('/user/session');
+  if (useMock) return request.get('/user/session');
+  return legacy.legacyFetchSession();
 }
 
-/** 登录（Mock / SDK 回调后刷新 session） */
+/** 登录 */
 export function login(payload) {
-  return request.post('/user/login', payload);
+  if (useMock) return request.post('/user/login', payload);
+  return legacy.legacyLogin(payload);
 }
 
 /** 退出登录 */
 export function logout() {
-  return request.post('/user/logout');
+  if (useMock) return request.post('/user/logout');
+  return legacy.legacyLogout();
 }
 
 /** 获取角色列表 */
 export function fetchRoles() {
-  return request.get('/user/roles');
+  if (useMock) return request.get('/user/roles');
+  return legacy.legacyFetchRoles();
 }
 
 /** 选择角色 */
 export function selectRole(payload) {
-  return request.post('/user/select-role', payload);
+  if (useMock) return request.post('/user/select-role', payload);
+  return legacy.legacySelectRole(payload);
 }

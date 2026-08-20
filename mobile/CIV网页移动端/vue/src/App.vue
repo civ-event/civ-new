@@ -14,7 +14,8 @@
       </filter>
     </defs>
   </svg>
-  <div id="canvas">
+  <div class="scale-viewport" :style="viewportStyle">
+  <div id="canvas" :style="canvasStyle">
     <div class="bg layer"></div>
     <div class="shouye layer-group">
       <div class="shouye-bg layer"></div>
@@ -538,7 +539,7 @@ Shovel x3                <br />
         <div class="nav-bg layer-group is-clickable" @click="handleLoginClick">
           <div class="rect-17 layer"></div>
           <div class="login layer">
-            <span>{{ userStore.isLoggedIn ? t('nav.logout') : t('nav.login') }}</span>
+            <span>{{ userStore.isLoggedIn ? userStore.displayName : t('nav.login') }}</span>
           </div>
         </div>
       </div>
@@ -572,6 +573,7 @@ Shovel x3                <br />
         </span>
       </div>
     </div>
+  </div>
   </div>
   <AppToast />
   <AppLoading />
@@ -609,10 +611,24 @@ import wheelDiscImg from './assets/images/wheel-disc.png'
 import wheelStandImg from './assets/images/wheel-stand.png'
 import wheelFrameImg from './assets/images/wheel-frame.png'
 import wheelCharacterImg from './assets/images/wheel-character.png'
+import { isInGameKitWebView, resolveLoginToken } from './bridge/auth.js'
+import { fetchSdkGameRole } from './bridge/role.js'
 
 const { t, locale } = useI18n()
 const activityStore = useActivityStore()
 const userStore = useUserStore()
+
+async function trySelectRoleFromSdk() {
+  try {
+    const sdkRole = await fetchSdkGameRole()
+    if (!sdkRole?.roleId) return
+
+    await userStore.selectRole(sdkRole.roleId)
+  } catch (e) {
+    console.warn('[SDK] auto select role failed', e)
+    // 失败则仍走手动选角
+  }
+}
 const { eventDurationText } = storeToRefs(activityStore)
 
 const {
@@ -663,8 +679,24 @@ const {
   handleTopupCenterClick,
 } = useTopupActions()
 
-const navScale = ref(1)
-const { scrollToSection } = useSectionNav(navScale)
+const DESIGN_WIDTH = 750
+const DESIGN_HEIGHT = 5083
+const scale = ref(1)
+
+const { scrollToSection } = useSectionNav(scale)
+
+function updateScale() {
+  const w = window.visualViewport?.width ?? window.innerWidth
+  scale.value = w / DESIGN_WIDTH
+}
+
+const viewportStyle = computed(() => ({
+  height: `${DESIGN_HEIGHT * scale.value}px`,
+}))
+
+const canvasStyle = computed(() => ({
+  transform: `scale(${scale.value})`,
+}))
 
 const languageMenuVisible = ref(false)
 const languageOptions = LANGUAGE_OPTIONS
@@ -714,11 +746,27 @@ watch(
 
 async function bootstrapAppData() {
   try {
+    // 自动登录：WebView 用 SDK token，浏览器用 URL player_token / env token / localStorage
+    if (!userStore.isLoggedIn) {
+      try {
+        const token = await resolveLoginToken()
+        if (token) {
+          await userStore.login({ accessToken: token })
+        }
+      } catch (e) {
+        console.warn('[auto-login] failed', e)
+      }
+    }
+
     await Promise.all([
       activityStore.loadInfo(),
       userStore.loadSession(),
     ])
     syncServerOffset()
+
+    if (isInGameKitWebView() && userStore.isLoggedIn && !userStore.hasRole) {
+      await trySelectRoleFromSdk()
+    }
   } catch (error) {
     console.error('[bootstrap] failed to load initial data', error)
   }
@@ -733,11 +781,16 @@ function handleDocumentClick(event) {
 }
 
 onMounted(() => {
+  updateScale()
   bootstrapAppData()
+  window.addEventListener('resize', updateScale)
+  window.visualViewport?.addEventListener('resize', updateScale)
   document.addEventListener('click', handleDocumentClick)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', updateScale)
+  window.visualViewport?.removeEventListener('resize', updateScale)
   document.removeEventListener('click', handleDocumentClick)
 })
 </script>
@@ -755,6 +808,12 @@ onUnmounted(() => {
 .login {
   white-space: nowrap;
 }
+.login span {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .svg-filters {
   position: absolute;
   width: 0;
@@ -767,26 +826,27 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 body {
-    width: 100vw;
+    width: 100%;
     min-height: 100vh;
     overflow-x: hidden;
     overflow-y: auto;
     background: #f0f0f0;
+    -webkit-text-size-adjust: 100%;
 }
-@media screen and (max-width: 750px) {
-    #canvas {
-        transform: scale(calc(100vw / 750));
-    }
+
+.scale-viewport {
+  width: 100%;
+  overflow: hidden;
+  touch-action: pan-y;
 }
 
 #canvas {
   position: relative;
-  transform-origin: top center;
+  transform-origin: top left;
   display: flex;
   flex-direction: column;
   width: 750px;
   height: 5083px;
-  margin: 0 auto;
   overflow: hidden;
   background: #fff;
 }
@@ -934,8 +994,22 @@ body {
   width: 709px;
   height: 1507px;
 }
-.title { display: flex; flex-direction: column; width: 601px; height: 87px; margin-left: 43px; }
-.btn-checkin { width: 599px; height: 48px; background: url("./assets/images/btn-checkin-6140b1.png") no-repeat; }
+.title {
+  display: flex;
+  flex-direction: column;
+  width: 601px;
+  height: 87px;
+  margin-left: 43px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.btn-checkin {
+  width: 599px;
+  height: 48px;
+  min-height: 48px;
+  flex-shrink: 0;
+  background: url("./assets/images/btn-checkin-6140b1.png") no-repeat center / 100% 100%;
+}
 .title-text {
   width: 560px;
   height: auto;
@@ -1844,10 +1918,26 @@ body {
   display: flex;
   flex-direction: column;
   width: 752px;
-  height: 1225px;
+  min-height: 1225px;
+  height: auto;
 }
-.title-2 { display: flex; flex-direction: column; width: 517px; height: 87px; margin-left: 117px; }
-.title-icon { width: 509px; height: 48px; margin-left: 4px; background: url("./assets/images/lucky-wheel-b79190.png") no-repeat; }
+.title-2 {
+  display: flex;
+  flex-direction: column;
+  width: 517px;
+  height: 87px;
+  margin-left: 117px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.title-icon {
+  width: 509px;
+  height: 48px;
+  min-height: 48px;
+  margin-left: 4px;
+  flex-shrink: 0;
+  background: url("./assets/images/lucky-wheel-b79190.png") no-repeat center / 100% 100%;
+}
 .title-text-2 {
   width: 517px;
   height: auto;
@@ -1859,7 +1949,14 @@ body {
   line-height: 22px;
   text-align: left;
 }
-.btn-draw-3-stack { position: relative; z-index: 160; width: 750px; height: 733px; margin-top: 44px; flex-shrink: 0; }
+.btn-draw-3-stack {
+  position: relative;
+  z-index: 160;
+  width: 750px;
+  height: 733px;
+  margin-top: 44px;
+  flex-shrink: 0;
+}
 .btn-draw-3 {
   position: absolute;
   left: 50%;
@@ -2124,8 +2221,22 @@ body {
   width: 694px;
   height: 581px;
 }
-.title-4 { display: flex; flex-direction: column; width: 637px; height: 87px; margin-left: 28px; }
-.reward-4 { width: 635px; height: 48px; background: url("./assets/images/reward-f8757c.png") no-repeat; }
+.title-4 {
+  display: flex;
+  flex-direction: column;
+  width: 637px;
+  height: 87px;
+  margin-left: 28px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.reward-4 {
+  width: 635px;
+  height: 48px;
+  min-height: 48px;
+  flex-shrink: 0;
+  background: url("./assets/images/reward-f8757c.png") no-repeat center / 100% 100%;
+}
 .title-text-3 {
   width: 580px;
   height: auto;

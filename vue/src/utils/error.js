@@ -19,17 +19,23 @@ export function getErrorMessage(error, fallback) {
   const defaultFallback = fallback ?? translateErrorCode(1) ?? 'Something went wrong. Please try again.';
   if (!error) return defaultFallback;
 
+  if (typeof error === 'string') return error;
+
+  if (typeof error === 'object' && error !== null) {
+    if ('msg' in error && typeof error.msg === 'string' && error.msg.trim()) {
+      return error.msg;
+    }
+    if ('message' in error && typeof error.message === 'string' && error.message.trim()) {
+      return error.message;
+    }
+  }
+
   const code = getErrorCode(error);
   if (typeof code === 'number') {
     const translated = translateErrorCode(code);
     if (translated) return translated;
   }
 
-  if (typeof error === 'string') return error;
-  if (typeof error === 'object' && error !== null) {
-    if ('msg' in error && typeof error.msg === 'string' && error.msg) return error.msg;
-    if ('message' in error && typeof error.message === 'string' && error.message) return error.message;
-  }
   return defaultFallback;
 }
 

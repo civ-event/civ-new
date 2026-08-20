@@ -14,18 +14,21 @@ export const useUserStore = defineStore('user', {
     loaded: false,
     isLoggedIn: false,
     token: null,
+    userName: null,
     role: null,
     roles: [],
   }),
   getters: {
     hasRole: (state) => Boolean(state.role?.roleId),
     canParticipate: (state) => state.isLoggedIn && state.role && state.role.level >= 5,
+    displayName: (state) => state.userName || state.role?.roleName || '',
   },
   actions: {
     async loadSession() {
       const data = await fetchSession();
       this.isLoggedIn = Boolean(data.isLoggedIn);
       this.token = data.token ?? null;
+      this.userName = data.userName ?? null;
       this.role = data.role ?? null;
       if (this.token) {
         localStorage.setItem(TOKEN_KEY, this.token);
@@ -65,6 +68,7 @@ export const useUserStore = defineStore('user', {
       }
       this.isLoggedIn = false;
       this.token = null;
+      this.userName = null;
       this.role = null;
       this.roles = [];
       localStorage.removeItem(TOKEN_KEY);

@@ -7,35 +7,43 @@ import {
   selectRole as selectRoleApi,
 } from '../api/user';
 
+const TOKEN_KEY = 'accessToken';
+
 export const useUserStore = defineStore('user', {
   state: () => ({
     loaded: false,
     isLoggedIn: false,
     token: null,
+    userName: null,
     role: null,
     roles: [],
   }),
   getters: {
     hasRole: (state) => Boolean(state.role?.roleId),
     canParticipate: (state) => state.isLoggedIn && state.role && state.role.level >= 5,
+    displayName: (state) => state.userName || state.role?.roleName || '',
   },
   actions: {
     async loadSession() {
       const data = await fetchSession();
       this.isLoggedIn = Boolean(data.isLoggedIn);
       this.token = data.token ?? null;
+      this.userName = data.userName ?? null;
       this.role = data.role ?? null;
       if (this.token) {
+        localStorage.setItem(TOKEN_KEY, this.token);
         localStorage.setItem('civ_event_token', this.token);
       } else {
+        localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem('civ_event_token');
       }
       this.loaded = true;
     },
-    async login() {
-      const data = await loginApi({});
+    async login(payload = {}) {
+      const data = await loginApi(payload);
       this.token = data.token;
       this.isLoggedIn = true;
+      localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem('civ_event_token', data.token);
       await this.loadSession();
       return data;
@@ -58,12 +66,14 @@ export const useUserStore = defineStore('user', {
       try {
         await logoutApi();
       } catch {
-        // 本地也要清登录态，避免接口失败后卡在已登录
+        // 本地也要清登录态
       }
       this.isLoggedIn = false;
       this.token = null;
+      this.userName = null;
       this.role = null;
       this.roles = [];
+      localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem('civ_event_token');
     },
   },

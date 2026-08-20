@@ -14,6 +14,7 @@ import {
   setMockScenario,
 } from './api/dev';
 
+
 const app = createApp(App);
 
 app.use(createPinia());

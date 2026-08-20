@@ -663,7 +663,7 @@
     <div class="denglu layer-group is-clickable" @click="handleLoginClick">
       <div class="rect-16 layer"></div>
       <div class="denglu-text layer">
-        <span>{{ userStore.isLoggedIn ? t('nav.logout') : t('nav.login') }}</span>
+        <span>{{ userStore.isLoggedIn ? userStore.displayName : t('nav.login') }}</span>
       </div>
     </div>
     <div class="btn-download layer-group is-clickable" @click="handleDownloadClick">
@@ -793,6 +793,21 @@ import wheelDiscImg from './assets/images/wheel-disc.png'
 import wheelStandImg from './assets/images/wheel-stand.png'
 import wheelFrameImg from './assets/images/wheel-frame.png'
 import wheelCharacterImg from './assets/images/wheel-character.png'
+import { isInGameKitWebView, resolveLoginToken } from './bridge/auth.js'
+import { fetchSdkGameRole } from './bridge/role.js'
+
+
+async function trySelectRoleFromSdk() {
+  try {
+    const sdkRole = await fetchSdkGameRole()
+    if (!sdkRole?.roleId) return
+
+    await userStore.selectRole(sdkRole.roleId)
+  } catch (e) {
+    console.warn('[SDK] auto select role failed', e)
+    // 失败则仍走手动选角
+  }
+}
 
 const { t, tm, locale } = useI18n()
 
@@ -920,13 +935,40 @@ function updateScale() {
   scale.value = Math.min(1, w / DESIGN_WIDTH)
 }
 
+//async function bootstrapAppData() {
+//  try {
+//    await Promise.all([
+//      activityStore.loadInfo(),
+//      userStore.loadSession(),
+//    ])
+//    syncServerOffset()
+//  } catch (error) {
+//    console.error('[bootstrap] failed to load initial data', error)
+//  }
+//}
 async function bootstrapAppData() {
   try {
+    // 自动登录：WebView 用 SDK token，浏览器用 URL player_token / env token / localStorage
+    if (!userStore.isLoggedIn) {
+      try {
+        const token = await resolveLoginToken()
+        if (token) {
+          await userStore.login({ accessToken: token })
+        }
+      } catch (e) {
+        console.warn('[auto-login] failed', e)
+      }
+    }
+
     await Promise.all([
       activityStore.loadInfo(),
       userStore.loadSession(),
     ])
     syncServerOffset()
+
+    if (isInGameKitWebView() && userStore.isLoggedIn && !userStore.hasRole) {
+      await trySelectRoleFromSdk()
+    }
   } catch (error) {
     console.error('[bootstrap] failed to load initial data', error)
   }
@@ -3638,6 +3680,9 @@ body {
   text-align: center;
 }
 .denglu-text span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .btn-download {
